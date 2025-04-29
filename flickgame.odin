@@ -44,6 +44,8 @@ BUFFER_HEIGHT :: 100
 ADDITIONAL_WIDTH  :: 44
 ADDITIONAL_HEIGHT :: 30
 
+HALF_OFFSET :: ADDITIONAL_WIDTH / 2
+
 BACKGROUND :: 4
 
 main :: proc() {
@@ -115,7 +117,7 @@ play_game :: proc(ctx: ^Context) {
 	mx, my    := lena.get_cursor()
 	the_image := ctx.images[ctx.current_image]
 
-	lena.draw_image_scaled(the_image, {0, 0, 148, 100}, {0, 0, 148 + ADDITIONAL_WIDTH, 100 + ADDITIONAL_HEIGHT})
+	lena.draw_image_scaled(the_image, {0, 0, BUFFER_WIDTH, BUFFER_HEIGHT}, {0, 0, BUFFER_WIDTH + ADDITIONAL_WIDTH, BUFFER_HEIGHT + ADDITIONAL_HEIGHT})
 
 	if lena.mouse_pressed(.LEFT) {
 		index := cast(int) lena.get_pixel(mx, my)
@@ -128,8 +130,8 @@ play_game :: proc(ctx: ^Context) {
 }
 
 edit_game :: proc(ctx: ^Context) {
-	mx, my    := lena.get_cursor()
-	mx -= ADDITIONAL_WIDTH / 2
+	mx, my := lena.get_cursor()
+	mx -= HALF_OFFSET
 
 	the_image := ctx.images[ctx.current_image]
 
@@ -151,7 +153,7 @@ edit_game :: proc(ctx: ^Context) {
 	}
 
 	if lena.key_pressed(.LEFT_BRACKET) {
-		ctx.current_size = max(ctx.current_size - 1, 0)
+		ctx.current_size = max(ctx.current_size - 1, 1)
 	}
 
 	if lena.key_pressed(.RIGHT_BRACKET) {
@@ -159,7 +161,11 @@ edit_game :: proc(ctx: ^Context) {
 	}
 
 	if ctx.is_drawing {
-		lena.draw_circle_to_image(the_image, mx, my, ctx.current_size, ctx.current_color, true)
+		if ctx.current_size == 1 {
+			lena.set_pixel_on_image(the_image, mx, my, ctx.current_color)
+		} else {
+			lena.draw_circle_to_image(the_image, mx, my, ctx.current_size, ctx.current_color, true)
+		}
 	}
 
 	lena.set_alpha_index(0)
@@ -167,7 +173,7 @@ edit_game :: proc(ctx: ^Context) {
 	for index in 0..<16 {
 		rect: lena.Rect
 
-		rect.x = index * 7 + 2 + ADDITIONAL_WIDTH / 2
+		rect.x = index * 7 + 2 + HALF_OFFSET
 		rect.y = BUFFER_HEIGHT + 2
 		rect.w = 6
 		rect.h = 6
@@ -176,7 +182,7 @@ edit_game :: proc(ctx: ^Context) {
 
 		index_u8 := cast(u8) index
 
-		if lena.mouse_pressed(.LEFT) && lena.is_inside(rect, mx + ADDITIONAL_WIDTH / 2, my) {
+		if lena.mouse_pressed(.LEFT) && lena.is_inside(rect, mx + HALF_OFFSET, my) {
 			ctx.current_color = index_u8
 		}
 
@@ -193,10 +199,11 @@ edit_game :: proc(ctx: ^Context) {
 
 		image := lena.get_glyph(linear_to_ascii_hex(index))
 
-		if lena.is_inside(rect, mx + ADDITIONAL_WIDTH / 2, my) {
+		if lena.is_inside(rect, mx + HALF_OFFSET, my) {
 			if lena.mouse_pressed(.LEFT) {
 				ctx.current_image = index
 			}
+
 			lena.draw_rect(rect, 12, true)
 		}
 
@@ -205,7 +212,7 @@ edit_game :: proc(ctx: ^Context) {
 		rect.y += 11
 		mapped := lena.get_glyph(linear_to_ascii_hex(ctx.mappings[index]))
 
-		if lena.is_inside(rect, mx + ADDITIONAL_WIDTH / 2, my) {
+		if lena.is_inside(rect, mx + HALF_OFFSET, my) {
 			if lena.mouse_pressed(.LEFT) {
 				ctx.mappings[index] = (ctx.mappings[index] + 1) % 17
 			}
@@ -219,10 +226,18 @@ edit_game :: proc(ctx: ^Context) {
 	lena.set_draw_state()
 	lena.set_alpha_index(BACKGROUND)
 
-	lena.draw_image(the_image, ADDITIONAL_WIDTH / 2, 0)
+	lena.draw_image(the_image, HALF_OFFSET, 0)
 
-	if !ctx.is_drawing && lena.is_inside({0, 0, the_image.w, the_image.h}, mx, my) {
-		lena.draw_circle(mx + ADDITIONAL_WIDTH / 2, my, ctx.current_size, ctx.current_color, false)
+	if !ctx.is_drawing {
+		lena.set_clip_rect({HALF_OFFSET, 0, BUFFER_WIDTH, BUFFER_HEIGHT})
+
+		if ctx.current_size == 1 {
+			lena.set_pixel(mx + HALF_OFFSET, my, ctx.current_color)
+		} else {
+			lena.draw_circle(mx + HALF_OFFSET, my, ctx.current_size, ctx.current_color, false)
+		}
+
+		lena.set_clip_rect()
 	}
 }
 
